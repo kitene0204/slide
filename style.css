@@ -1,0 +1,212 @@
+:root {
+    --bg-dark: #0a0a0a;
+    --text-main: #ffffff;
+    --text-muted: #a0a0a0;
+    --accent-blue: #3b82f6;
+    --accent-red: #ef4444;
+    --accent-yellow: #eab308;
+    --card-bg: #1a1a1a;
+    --border-color: #333;
+    
+    font-family: 'Pretendard', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    line-height: 1.6;
+}
+
+/* Layout */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+nav button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.3s;
+}
+
+nav button:hover, nav button.active {
+    color: var(--text-main);
+    background-color: var(--card-bg);
+}
+
+main {
+    flex: 1;
+    overflow: hidden;
+}
+
+.view {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+}
+.view.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+input, textarea {
+    width: 100%;
+    padding: 0.8rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: 4px;
+    font-family: inherit;
+}
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+button {
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.3s;
+}
+button:hover {
+    opacity: 0.9;
+}
+
+/* Split Layout */
+.split-layout {
+    display: flex;
+    height: 100%;
+}
+.sidebar {
+    width: 350px;
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-color);
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+.slide-container {
+    background: #000;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.preview-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+/* Slides specific */
+.slide-item {
+    background: var(--bg-dark);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+.slide-container {
+    width: 960px;
+    height: 540px;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    position: relative;
+    border: 1px solid #222;
+}
+
+/* Presentation aesthetics */
+.slide-content h1 {
+    font-size: 4.5rem;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+}
+.slide-content h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+.slide-content .highlight-box {
+    border: 2px solid var(--text-main);
+    padding: 1rem 2rem;
+    display: inline-block;
+    margin-bottom: 1rem;
+}
+.slide-content .text-blue { color: var(--accent-blue); }
+.slide-content .text-red { color: var(--accent-red); }
+.slide-content p {
+    font-size: 1.8rem;
+    margin-top: 1rem;
+    font-weight: 500;
+}
+
+/* Controls */
+.slide-controls {
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.hidden { display: none !important; }
