@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 교사 연수 슬라이드 생성기</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: #1a1a1a; border-bottom: 1px solid #333;">
+            <h1 style="font-size: 1.5rem; margin: 0; color: var(--accent-blue);">AI 슬라이드 생성기</h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <nav style="display: flex; gap: 10px;">
+                    <button id="nav-outline" class="active">개요 생성기</button>
+                    <button id="nav-slides">슬라이드 생성기</button>
+                </nav>
+                <button id="export-ppt-btn" style="background: #10b981; padding: 8px 16px; font-size: 0.9rem; font-weight: bold; display: none;">📥 PPT 다운로드</button>
+                <button id="export-gslides-btn" style="background: #fbbc04; color: #000; padding: 8px 16px; font-size: 0.9rem; font-weight: bold; display: none;">📒 구글 슬라이드</button>
+            </div>
+        </header>
+        <main id="main-content">
+            <!-- Outline Generator View -->
+            <section id="outline-view" class="view active">
+                <div class="container" style="padding-top:1rem; margin-bottom: 5rem;">
+                    <h2>연수 개요 생성기</h2>
+                    <p style="color: var(--text-muted); margin-bottom: 20px;">어떤 연수를 기획하고 계신가요?</p>
+                    
+                    <div class="form-group" style="background:#1a1a1a; padding:20px; border-radius:8px; border:1px solid #333; margin-bottom: 30px;">
+                        <label style="color:var(--accent-blue); font-size:1.1rem; display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                            📄 구글 Docs 초안 붙여넣기 (AI 자동 분석)
+                        </label>
+                        <p style="font-size:0.85rem; color:#888; margin-bottom:15px; line-height:1.5;">작성해두신 연수 기획안 텍스트를 아래에 통째로 붙여넣으시면, '📍', '도입', '실습', '마무리' 등의 키워드를 인식하여 슬라이드 단위로 자동 분할해 줍니다.</p>
+                        <textarea id="docs-input" style="height: 120px; background:#0f0f0f; border:1px solid #222;" placeholder="[여기에 텍스트 붙여넣기]&#10;예시:&#10;📍 1차시: AI 개론&#10;도입: AI의 필요성&#10;실습: 제미나이 써보기"></textarea>
+                        <button id="parse-docs-btn" style="margin-top:10px; background:var(--accent-blue); width:100%; padding:12px; font-weight:bold;">🪄 텍스트 자동 분석하여 슬라이드 요건 채우기</button>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #333; margin-bottom: 30px; position:relative;">
+                        <span style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--card-bg); padding:0 15px; color:#666; font-size:0.9rem;">또는 직접 입력하기</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>연수 주제</label>
+                        <input type="text" id="topic-input" placeholder="예: 구글 제미나이 활용 수업">
+                    </div>
+                    <div class="form-group">
+                        <label>대상 및 목적</label>
+                        <textarea id="audience-input" placeholder="초등교사 대상, 업무 경감 및 학생 참여 유도..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label style="display:flex; justify-content:space-between; align-items:center;">
+                            슬라이드별 필수 내용 및 키워드
+                            <button id="add-req-btn" style="padding: 4px 10px; font-size: 12px; background: #333;">+ 슬라이드 추가</button>
+                        </label>
+                        <div id="outline-slide-reqs" style="margin-top:10px;">
+                            <!-- JS will inject req items here -->
+                        </div>
+                    </div>
+                    <button id="generate-outline-btn">개요 초안 만들기</button>
+                    <div id="outline-result" class="result-box hidden"></div>
+                    <div style="height: 50px;"></div> <!-- 스크롤 여백 -->
+                </div>
+            </section>
+            
+            <section id="slides-view" class="view hidden">
+                <div class="split-layout">
+                    <div class="sidebar">
+                        <h2>슬라이드 내용 입력</h2>
+                        <div id="slide-inputs">
+                            <!-- JS will inject slide form items here -->
+                        </div>
+                        <button id="add-slide-btn" style="width:100%; margin-top:10px;">+ 슬라이드 추가</button>
+                    </div>
+                    <div class="preview-area">
+                        <div class="slide-container" id="slide-preview">
+                            <!-- JS will render the active slide here -->
+                        </div>
+                        <div class="slide-controls" style="margin-top: 15px; display: flex; justify-content: center; gap: 10px; align-items: center;">
+                            <button id="prev-slide-btn" style="padding: 8px 16px;">이전</button>
+                            <span id="slide-counter" style="font-weight:bold;">1 / 1</span>
+                            <button id="next-slide-btn" style="padding: 8px 16px;">다음</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Navigation
+        var navOutline = document.getElementById('nav-outline');
+        var navSlides = document.getElementById('nav-slides');
+        var viewOutline = document.getElementById('outline-view');
+        var viewSlides = document.getElementById('slides-view');
+
+        navOutline.addEventListener('click', function() {
+            navOutline.className = 'active';
+            navSlides.className = '';
+            viewOutline.className = 'view active';
+            viewSlides.className = 'view hidden';
+            document.getElementById('export-ppt-btn').style.display = 'none';
+            document.getElementById('export-gslides-btn').style.display = 'none';
+        });
+
+        navSlides.addEventListener('click', function() {
+            navSlides.className = 'active';
+            navOutline.className = '';
+            viewSlides.className = 'view active';
+            viewOutline.className = 'view hidden';
+            document.getElementById('export-ppt-btn').style.display = 'block';
+            document.getElementById('export-gslides-btn').style.display = 'block';
+        });
+
+        var reqsData = [
+            { role: "도입", content: "AI의 필요성, 환각 현상 극복" },
+            { role: "전개 1", content: "구글 제미나이 활용법 (공문 요약)" },
+            { role: "전개 2", content: "노트북LM (환각 없는 맞춤형 AI)" },
+            { role: "실습", content: "바이브 코딩으로 나만의 웹앱 만들기" },
+            { role: "마무리", content: "수업 적용 계획 및 Q&A" }
+        ];
+
+        var reqsContainer = document.getElementById('outline-slide-reqs');
+        var addReqBtn = document.getElementById('add-req-btn');
+
+        function renderReqsForm() {
+            reqsContainer.innerHTML = '';
+            for(var i=0; i<reqsData.length; i++) {
+                var div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.gap = '6px';
+                div.style.marginBottom = '10px';
+                
+                div.innerHTML = 
+                    '<div style="display:flex; flex-direction:column; gap:2px;">' +
+                    '<button class="move-up-btn" data-index="' + i + '" style="background:#444; padding:2px 8px; font-size:10px; border-radius:4px 4px 0 0;" title="위로">▲</button>' +
+                    '<button class="move-down-btn" data-index="' + i + '" style="background:#444; padding:2px 8px; font-size:10px; border-radius:0 0 4px 4px;" title="아래로">▼</button>' +
+                    '</div>' +
+                    '<input type="text" class="req-role" data-index="' + i + '" value="' + reqsData[i].role.replace(/"/g, '&quot;') + '" style="flex:1;" placeholder="구분 (예: 도입)">' +
+                    '<input type="text" class="req-content" data-index="' + i + '" value="' + reqsData[i].content.replace(/"/g, '&quot;') + '" style="flex:3;" placeholder="필수 키워드 및 내용">' +
+                    '<button class="ai-polish-btn" data-index="' + i + '" style="background:var(--accent-blue); padding:0 10px; font-size:12px; white-space:nowrap;">✨ AI 다듬기</button>' +
+                    '<button class="del-req-btn" data-index="' + i + '" style="background:var(--accent-red); padding:0 12px;">X</button>';
+                reqsContainer.appendChild(div);
+            }
+
+            var roles = document.querySelectorAll('.req-role');
+            for(var r=0; r<roles.length; r++) {
+                roles[r].addEventListener('input', function(e) {
+                    reqsData[parseInt(e.target.getAttribute('data-index'))].role = e.target.value;
+                });
+            }
+
+            var contents = document.querySelectorAll('.req-content');
+            for(var c=0; c<contents.length; c++) {
+                contents[c].addEventListener('input', function(e) {
+                    reqsData[parseInt(e.target.getAttribute('data-index'))].content = e.target.value;
+                });
+            }
+
+            var dels = document.querySelectorAll('.del-req-btn');
+            for(var d=0; d<dels.length; d++) {
+                dels[d].addEventListener('click', function(e) {
+                    reqsData.splice(parseInt(e.target.getAttribute('data-index')), 1);
+                    renderReqsForm();
+                });
+            }
+
+            var ups = document.querySelectorAll('.move-up-btn');
+            for(var u=0; u<ups.length; u++) {
+                ups[u].addEventListener('click', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    if (idx > 0) {
+                        var temp = reqsData[idx-1];
+                        reqsData[idx-1] = reqsData[idx];
+                        reqsData[idx] = temp;
+                        renderReqsForm();
+                    }
+                });
+            }
+
+            var downs = document.querySelectorAll('.move-down-btn');
+            for(var dw=0; dw<downs.length; dw++) {
+                downs[dw].addEventListener('click', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    if (idx < reqsData.length - 1) {
+                        var temp = reqsData[idx+1];
+                        reqsData[idx+1] = reqsData[idx];
+                        reqsData[idx] = temp;
+                        renderReqsForm();
+                    }
+                });
+            }
+
+            var ais = document.querySelectorAll('.ai-polish-btn');
+            for(var a=0; a<ais.length; a++) {
+                ais[a].addEventListener('click', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    var currentText = reqsData[idx].content.trim();
+                    if (!currentText) currentText = reqsData[idx].role || "수업";
+                    
+                    var polished = "";
+                    if (currentText.indexOf("노트북") > -1 || currentText.indexOf("LM") > -1) {
+                        polished = currentText + " -> 교과서 기반으로 환각 없이 질문에 답하는 맞춤형 AI 조교 시스템 구축";
+                    } else if (currentText.indexOf("제미나이") > -1 || currentText.indexOf("Gemini") > -1 || currentText.indexOf("젬스") > -1) {
+                        polished = currentText + " -> 수업 자료 초안 작성 및 복잡한 행정 공문 핵심 요약을 통한 업무 자동화";
+                    } else if (currentText.indexOf("코딩") > -1 || currentText.indexOf("바이브") > -1 || currentText.indexOf("웹앱") > -1) {
+                        polished = currentText + " -> 자연어 프롬프트를 활용하여 학생 참여형 인터랙티브 퀴즈 웹앱 즉석 제작";
+                    } else {
+                        polished = currentText + "의 핵심 개념 이해 및 교육 현장(수업/행정) 실제 적용 사례와 시사점 도출";
+                    }
+                    
+                    reqsData[idx].content = polished;
+                    renderReqsForm();
+                });
+            }
+        }
+
+        addReqBtn.addEventListener('click', function() {
+            reqsData.push({ role: '새 슬라이드', content: '' });
+            renderReqsForm();
+        });
+
+        // Initialize outline requirements form
+        renderReqsForm();
+
+        // Parse Docs Logic
+        var parseDocsBtn = document.getElementById('parse-docs-btn');
+        if (parseDocsBtn) {
+            parseDocsBtn.addEventListener('click', function() {
+                var text = document.getElementById('docs-input').value;
+                if (!text.trim()) {
+                    alert("먼저 구글 Docs 초안 텍스트를 붙여넣어 주세요.");
+                    return;
+                }
+                
+                var lines = text.split('\n');
+                var currentRole = "연수 제목 및 목표";
+                var currentContent = "";
+                var parsedReqs = [];
+                
+                for (var i=0; i<lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    // Chapter markers or slide markers
+                    var isChapter = line.startsWith('📍') || line.startsWith('■') || line.match(/^\[.*차시\]/);
+                    var isSlide = line.match(/^(도입|전개|실습|마무리|결론|평가)/);
+                    
+                    if (isChapter || isSlide) {
+                        if (currentContent.trim()) {
+                            parsedReqs.push({ role: currentRole, content: currentContent.trim() });
+                        }
+                        
+                        var colonIdx = line.indexOf(':');
+                        if (colonIdx > -1 && colonIdx < 25) { 
+                            currentRole = line.substring(0, colonIdx).trim();
+                            currentContent = line.substring(colonIdx + 1).trim() + "\n";
+                        } else {
+                            currentRole = line;
+                            currentContent = "";
+                        }
+                    } else {
+                        currentContent += line + "\n";
+                    }
+                }
+                if (currentContent.trim()) {
+                    parsedReqs.push({ role: currentRole, content: currentContent.trim() });
+                }
+                
+                if (parsedReqs.length > 0) {
+                    reqsData = parsedReqs;
+                    renderReqsForm();
+                    // Scroll to requirements
+                    document.getElementById('outline-slide-reqs').scrollIntoView({behavior: 'smooth', block: 'start'});
+                    alert("성공적으로 초안을 분석하여 " + parsedReqs.length + "개의 슬라이드 요건으로 자동 분할했습니다!");
+                } else {
+                    alert("분석할 수 있는 구조(📍, 도입, 실습 등)를 찾지 못했습니다. 텍스트를 확인해주세요.");
+                }
+            });
+        }
+
+        // Outline Generator Logic
+        var btnGenerateOutline = document.getElementById('generate-outline-btn');
+        var outlineResult = document.getElementById('outline-result');
+        var topicInput = document.getElementById('topic-input');
+
+        btnGenerateOutline.addEventListener('click', function() {
+            var topic = topicInput.value;
+            if(!topic) topic = 'AI 도구 활용';
+            
+            var html = "<h3>'" + topic + "' 연수 맞춤형 개요</h3>" +
+                       "<div style='margin-top:15px; font-size:0.95em; line-height: 1.7;'>";
+            
+            for(var i=0; i<reqsData.length; i++) {
+                html += "<p><strong>" + (i+1) + ". " + reqsData[i].role + "</strong><br>" +
+                        "<span style='color:var(--text-muted)'>- 핵심 키워드: <span class='text-blue'>" + reqsData[i].content + "</span></span></p>";
+            }
+            
+            html += "</div>" +
+                    "<div style='margin-top: 20px;'>" +
+                    "<button id='apply-outline-btn' style='width: 100%; padding: 1rem; font-size: 1.1rem;'>이 개요로 슬라이드 " + reqsData.length + "장 자동 생성하기</button>" +
+                    "</div>";
+            
+            outlineResult.innerHTML = html;
+            outlineResult.className = 'result-box';
+            outlineResult.style.display = 'block';
+            outlineResult.style.padding = '1.5rem';
+            outlineResult.style.marginTop = '1.5rem';
+            outlineResult.style.background = '#111';
+            outlineResult.style.border = '1px solid #333';
+            outlineResult.style.borderRadius = '4px';
+
+            document.getElementById('apply-outline-btn').addEventListener('click', function() {
+                slidesData = [];
+                for(var i=0; i<reqsData.length; i++) {
+                    var desc = reqsData[i].content;
+                    var mainTitle = reqsData[i].role;
+                    
+                    var contentLines = desc.split('\\n');
+                    var firstLine = contentLines[0] ? contentLines[0].trim() : '';
+                    
+                    if (firstLine && firstLine.length <= 30) {
+                        mainTitle = firstLine;
+                        var rest = contentLines.slice(1).join('\\n').trim();
+                        if (rest) desc = rest; 
+                    } else if (firstLine && firstLine.length > 30) {
+                        var kwParts = firstLine.split(',');
+                        if (kwParts[0] && kwParts[0].length <= 30) {
+                            mainTitle = kwParts[0].trim();
+                        } else {
+                            var spaceIdx = firstLine.indexOf(' ', 15);
+                            if (spaceIdx > -1 && spaceIdx <= 30) {
+                                mainTitle = firstLine.substring(0, spaceIdx).trim() + "...";
+                            }
+                        }
+                    }
+                    
+                    var prompt = "A cinematic dark educational background showing " + (reqsData[i].role + " " + mainTitle) + ", highly detailed, cyber punk style, glowing neon elements, 4k";
+                    
+                    slidesData.push({
+                        subtitle: reqsData[i].role,
+                        title: mainTitle,
+                        description: desc ? ("<span class='text-blue'>" + desc + "</span>") : "",
+                        hasBox: i === 0 || i === reqsData.length - 1,
+                        imagePrompt: prompt,
+                        imageUrl: ""
+                    });
+                }
+                currentSlideIndex = 0;
+                
+                navSlides.click();
+                renderSlideForm();
+                renderPreview();
+            });
+        });
+
+        // Slide Generator Logic
+        var slidesData = [
+            {
+                subtitle: "왜 '팀(Multi)'을 꾸려야 할까?",
+                title: "환각(Hallucination)\n박살내기",
+                description: "혼자 다 하면 헛소리를 합니다.\n역할을 <span class='text-blue'>잘게 쪼개고 검수</span>해야 절대 실수하지 않습니다.",
+                hasBox: false,
+                imagePrompt: "A glowing blue shield breaking through dark digital noise, cyberpunk style, high resolution",
+                imageUrl: ""
+            },
+            {
+                subtitle: "에이전트의 '자율성' 원리",
+                title: "무한 루프의\n쳇바퀴 (ReAct)",
+                description: "이 과정을 목표 달성 시까지 AI가 <span class='text-red'>무한 반복</span>시킵니다.",
+                hasBox: false,
+                imagePrompt: "An infinite glowing red loop symbol floating in a dark server room, neon lights, 4k",
+                imageUrl: ""
+            }
+        ];
+        var currentSlideIndex = 0;
+
+        var slideInputsContainer = document.getElementById('slide-inputs');
+        var slidePreview = document.getElementById('slide-preview');
+        var addSlideBtn = document.getElementById('add-slide-btn');
+        var prevBtn = document.getElementById('prev-slide-btn');
+        var nextBtn = document.getElementById('next-slide-btn');
+        var slideCounter = document.getElementById('slide-counter');
+
+        function renderSlideForm() {
+            slideInputsContainer.innerHTML = '';
+            for(var i=0; i<slidesData.length; i++) {
+                var slide = slidesData[i];
+                var div = document.createElement('div');
+                div.className = 'slide-item';
+                
+                var checkedAttr = slide.hasBox ? 'checked' : '';
+                var html = '<div style="display:flex; justify-content:space-between; margin-bottom: 10px;">' +
+                           '<strong>슬라이드 ' + (i + 1) + '</strong>' +
+                           '<button class="del-btn" data-index="' + i + '" style="padding: 2px 8px; background:var(--accent-red); font-size:12px;">삭제</button>' +
+                           '</div>' +
+                           '<div class="form-group"><input type="text" class="input-subtitle" data-index="' + i + '" value="' + (slide.subtitle || '').replace(/"/g, '&quot;') + '" placeholder="작은 제목 (선택)"></div>' +
+                           '<div class="form-group"><textarea class="input-title" data-index="' + i + '" placeholder="큰 제목 (줄바꿈은 \\n 입력)">' + (slide.title || '') + '</textarea></div>' +
+                           '<div class="form-group"><textarea class="input-desc" data-index="' + i + '" placeholder="하단 설명 (HTML 태그로 색상 강조 가능, 줄바꿈 \\n)">' + (slide.description || '') + '</textarea></div>' +
+                           '<label style="font-size: 14px; display: flex; align-items: center; gap: 5px;">' +
+                           '<input type="checkbox" class="input-box" data-index="' + i + '" ' + checkedAttr + '/> 제목에 테두리 박스 적용</label>' +
+                           '<div style="margin-top: 15px; border-top: 1px dashed #333; padding-top: 10px;">' +
+                           '<label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:5px;">슬라이드 삽입 이미지 생성기</label>' +
+                           '<div style="display:flex; gap:5px;">' +
+                           '<input type="text" class="input-prompt" data-index="' + i + '" value="' + (slide.imagePrompt || '').replace(/"/g, '&quot;') + '" style="flex:1; font-size:12px; padding:0.5rem;" placeholder="이미지 프롬프트 (예: 사이버펑크 교실, 네온 불빛)">' +
+                           '<button class="gen-image-btn" data-index="' + i + '" style="background:#8b5cf6; padding:0 10px; font-size:12px; white-space:nowrap;">🎨 이미지 생성</button>' +
+                           '</div></div>';
+                div.innerHTML = html;
+                slideInputsContainer.appendChild(div);
+            }
+
+            var inputsSubtitle = document.querySelectorAll('.input-subtitle');
+            for(var j=0; j<inputsSubtitle.length; j++) {
+                inputsSubtitle[j].addEventListener('input', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    slidesData[idx].subtitle = e.target.value;
+                    if(currentSlideIndex === idx) renderPreview();
+                });
+            }
+
+            var inputsTitle = document.querySelectorAll('.input-title');
+            for(var k=0; k<inputsTitle.length; k++) {
+                inputsTitle[k].addEventListener('input', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    slidesData[idx].title = e.target.value;
+                    if(currentSlideIndex === idx) renderPreview();
+                });
+            }
+
+            var inputsDesc = document.querySelectorAll('.input-desc');
+            for(var l=0; l<inputsDesc.length; l++) {
+                inputsDesc[l].addEventListener('input', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    slidesData[idx].description = e.target.value;
+                    if(currentSlideIndex === idx) renderPreview();
+                });
+            }
+
+            var inputsBox = document.querySelectorAll('.input-box');
+            for(var m=0; m<inputsBox.length; m++) {
+                inputsBox[m].addEventListener('change', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    slidesData[idx].hasBox = e.target.checked;
+                    if(currentSlideIndex === idx) renderPreview();
+                });
+            }
+
+            var prompts = document.querySelectorAll('.input-prompt');
+            for(var p=0; p<prompts.length; p++) {
+                prompts[p].addEventListener('input', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    slidesData[idx].imagePrompt = e.target.value;
+                });
+            }
+
+            var genBtns = document.querySelectorAll('.gen-image-btn');
+            for(var g=0; g<genBtns.length; g++) {
+                genBtns[g].addEventListener('click', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    var slide = slidesData[idx];
+                    var prompt = slide.imagePrompt || slide.title.replace(/<[^>]*>?/gm, '');
+                    
+                    var btn = e.target;
+                    btn.innerText = "생성중...";
+                    btn.disabled = true;
+                    btn.style.opacity = "0.5";
+                    
+                    var seed = Math.floor(Math.random() * 100000);
+                    // 간소화된 URL
+                    var url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) + "?seed=" + seed;
+                    
+                    var img = new Image();
+                    img.onload = function() {
+                        slide.imageUrl = url;
+                        btn.innerText = "🎨 다시 생성";
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                        if(currentSlideIndex === idx) renderPreview();
+                    };
+                    img.onerror = function() {
+                        alert("이미지 생성에 실패했습니다. 학교망 등에서 AI 이미지 사이트가 차단되었을 수 있습니다. 스마트폰 핫스팟으로 시도해보시거나 잠시 후 다시 시도해주세요.");
+                        btn.innerText = "🎨 이미지 생성";
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                    }
+                    img.src = url;
+                });
+            }
+
+            var delBtns = document.querySelectorAll('.del-btn');
+            for(var n=0; n<delBtns.length; n++) {
+                delBtns[n].addEventListener('click', function(e) {
+                    var idx = parseInt(e.target.getAttribute('data-index'));
+                    slidesData.splice(idx, 1);
+                    if(currentSlideIndex >= slidesData.length) currentSlideIndex = Math.max(0, slidesData.length - 1);
+                    renderSlideForm();
+                    renderPreview();
+                });
+            }
+        }
+
+        function renderPreview() {
+            if(slidesData.length === 0) {
+                slidePreview.innerHTML = '<p style="color:#a0a0a0">슬라이드를 추가해주세요.</p>';
+                slideCounter.innerHTML = '0 / 0';
+                return;
+            }
+            
+            var slide = slidesData[currentSlideIndex];
+            var titleHtml = (slide.title || '').replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+            if(slide.hasBox) {
+                titleHtml = '<div class="highlight-box">' + titleHtml + '</div>';
+            }
+            
+            var descHtml = (slide.description || '').replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+
+            var html = '<div class="slide-content" style="animation: fadeIn 0.5s ease; position: relative; z-index: 2; width: 100%; height: 100%; display: flex; align-items: center; gap: 3rem; text-align: left; padding: 2rem 4rem; box-sizing: border-box;">';
+            html += '<div style="flex: 1; max-height: 100%; overflow-y: auto; padding-right: 1rem;">';
+            if(slide.subtitle) {
+                html += '<h2>' + slide.subtitle + '</h2>';
+            }
+            html += '<h1>' + titleHtml + '</h1>';
+            if(slide.description) {
+                html += '<p>' + descHtml + '</p>';
+            }
+            html += '</div>';
+
+            if (slide.imageUrl) {
+                html += '<div style="flex: 1; text-align: center; animation: fadeIn 1s ease; max-height: 100%; display: flex; align-items: center; justify-content: center;">';
+                html += '<img src="' + slide.imageUrl + '" style="max-width: 100%; max-height: 90%; object-fit: contain; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+
+            slidePreview.style.position = 'relative';
+            slidePreview.style.overflow = 'hidden';
+            slidePreview.innerHTML = html;
+            slideCounter.innerHTML = (currentSlideIndex + 1) + ' / ' + slidesData.length;
+        }
+
+        addSlideBtn.addEventListener('click', function() {
+            slidesData.push({
+                subtitle: '', 
+                title: '새 슬라이드', 
+                description: '', 
+                hasBox: false,
+                imagePrompt: 'educational, dark, cinematic, neon lights',
+                imageUrl: ''
+            });
+            currentSlideIndex = slidesData.length - 1;
+            renderSlideForm();
+            renderPreview();
+            var sidebar = document.querySelector('.sidebar');
+            if(sidebar) sidebar.scrollTop = sidebar.scrollHeight;
+        });
+
+        prevBtn.addEventListener('click', function() {
+            if(currentSlideIndex > 0) {
+                currentSlideIndex--;
+                renderPreview();
+            }
+        });
+
+        nextBtn.addEventListener('click', function() {
+            if(currentSlideIndex < slidesData.length - 1) {
+                currentSlideIndex++;
+                renderPreview();
+            }
+        });
+
+        // Initialize
+        renderSlideForm();
+        renderPreview();
+
+        // Export to PPTX logic
+        var exportBtn = document.getElementById('export-ppt-btn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', function() {
+                if (slidesData.length === 0) return alert("내보낼 슬라이드가 없습니다.");
+                
+                exportBtn.innerText = "⏳ 생성 중...";
+                exportBtn.disabled = true;
+                
+                try {
+                    var PptxGen = window.PptxGenJS || window.pptxgen;
+                    if (!PptxGen) throw new Error("PPTX 라이브러리가 아직 로드되지 않았습니다.");
+                    
+                    var pptx = new PptxGen();
+                    pptx.layout = 'LAYOUT_16x9';
+                    
+                    for (var i=0; i<slidesData.length; i++) {
+                        var sData = slidesData[i];
+                        var slide = pptx.addSlide();
+                        
+                        slide.background = { color: '111111' };
+                        
+                        var textW = '80%';
+                        // 이미지 삽입은 CORS 문제로 PPT 생성을 실패하게 만들 수 있으므로 제외합니다.
+                        // 사용자는 구글 슬라이드에서 이미지를 별도로 추가할 수 있습니다.
+                        
+                        var contentY = 1.0;
+                        
+                        if (sData.subtitle) {
+                            slide.addText(sData.subtitle.replace(/<[^>]*>?/gm, ''), { x: 0.5, y: contentY, w: textW, fontSize: 18, color: 'a0a0a0', fontFace: 'Malgun Gothic' });
+                            contentY += 0.5;
+                        }
+                        
+                        if (sData.title) {
+                            var cleanTitle = sData.title.replace(/\\n/g, '\\n').replace(/<[^>]*>?/gm, '');
+                            slide.addText(cleanTitle, { x: 0.5, y: contentY, w: textW, fontSize: 36, bold: true, color: 'ffffff', fontFace: 'Malgun Gothic' });
+                            contentY += 1.5;
+                        }
+                        
+                        if (sData.description) {
+                            var cleanDesc = sData.description.replace(/\\n/g, '\\n').replace(/<[^>]*>?/gm, '');
+                            slide.addText(cleanDesc, { x: 0.5, y: contentY, w: textW, fontSize: 20, color: 'cccccc', fontFace: 'Malgun Gothic' });
+                        }
+                    }
+                    
+                    pptx.writeFile({ fileName: 'AI_Training_Slides.pptx' }).then(function() {
+                        exportBtn.innerText = "📥 PPT 다운로드";
+                        exportBtn.disabled = false;
+                    }).catch(function(err) {
+                        alert("PPT 파일 저장 오류: " + (err.message || err));
+                        exportBtn.innerText = "📥 PPT 다운로드";
+                        exportBtn.disabled = false;
+                    });
+                } catch(err) {
+                    alert("PPT 생성 오류: " + (err.message || err));
+                    exportBtn.innerText = "📥 PPT 다운로드";
+                    exportBtn.disabled = false;
+                    console.error(err);
+                }
+            });
+        }
+
+        // Google Slides Guide
+        var gSlidesBtn = document.getElementById('export-gslides-btn');
+        if (gSlidesBtn) {
+            gSlidesBtn.addEventListener('click', function() {
+                alert("💡 구글 슬라이드로 여는 방법:\n\n1. 먼저 옆의 [PPT 다운로드] 버튼을 눌러 파일을 내 PC에 저장합니다.\n2. 구글 드라이브(drive.google.com)를 엽니다.\n3. 다운받은 PPT 파일을 구글 드라이브에 끌어다 놓습니다.\n4. 업로드된 파일을 더블클릭하면 완벽하게 구글 슬라이드로 변환되어 열립니다!");
+                window.open('https://drive.google.com', '_blank');
+            });
+        }
+    });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+</body>
+</html>
